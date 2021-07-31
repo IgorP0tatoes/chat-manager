@@ -1,0 +1,19 @@
+{
+  "name": "vkbot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@vk-io/hear": "^1.1.0",
+    "node-vk-bot-api": "^3.5.0",
+    "nodemon": "^2.0.9",
+    "vk-io": "^4.3.1"
+  }
+}
