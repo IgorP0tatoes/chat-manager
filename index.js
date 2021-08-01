@@ -63,8 +63,9 @@ function loadUser(id, peerId) {
   if (!users[peerId]) users[peerId] = [];
   return users[peerId][id] = loadUserStatement.get(id, peerId);
 }
+
 function saveUser(user) {
-  updateUserStatement.run(user.nick, user.role, user.ban, user.warns, use.messages, user.id, user.peerId);
+  updateUserStatement.run(user.nick, user.role, user.ban, user.warns, user.messages, user.id, user.peerId);
 }
 
 
@@ -82,19 +83,23 @@ vk.updates.on('message', async (msg, context) => {
 
   if ((user.role == 1) && (msg.attachments.some(x => x instanceof StickerAttachment))) {
     user.warns++;
+    saveUser(user);
     getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за стикер [` + user.warns + `/3]`));
   }
   if ((user.role == 1) && (msg.attachments.some(x => x instanceof AudioMessageAttachment))) {
     user.warns++;
+    saveUser(user);
     getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за голосовое сообщение [` + user.warns + `/3]`));
   }
   if ((user.role == 1) && (msg.attachments.some(x => x instanceof GraffitiAttachment))) {
     user.warns++;
+    saveUser(user);
     getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за граффити [` + user.warns + `/3]`));
   }
   if (user.warns == 3) {
     msg.send("Три варна, бб");
     user.warns = 0;
+    saveUser(user);
     vk.api.messages.removeChatUser({ chat_id: msg.chatId, user_id: user.id });
   }
 
@@ -122,12 +127,14 @@ bot.hear(/^(?:!warn|!варн)$/i, (msg, next) => {
   if (u.role >= user.role) return msg.send("Нельзя");
 
   u.warns++;
+  saveUser(u);
   getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${u.id}` + `(` + fullName + `) ` + `получил предупреждение [` + u.warns + `/3]`));
 
   if (u.warns == 3) {
     msg.send("Три варна, бб");
     u.warns = 0;
     vk.api.messages.removeChatUser({ chat_id: msg.chatId, user_id: u.id });
+    saveUser(u);
   };
 
   return next();
@@ -142,6 +149,8 @@ bot.hear(/^(?:!kick|!кик)$/i, msg => {
   if (u.role >= user.role) return msg.send("Нельзя");
 
   u.warns = 0;
+  saveUser(u);
+
   getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${u.id}` + `(` + fullName + `) ` + `был кикнут из беседы`));
   vk.api.messages.removeChatUser({ chat_id: msg.chatId, user_id: u.id });
 });
@@ -157,6 +166,8 @@ bot.hear(/^(?:!ban|!бан)$/i, msg => {
 
   u.ban = true;
   u.warns = 0;
+  saveUser(u);
+
   getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${u.id}` + `(` + fullName + `) ` + `получил бан`));
   vk.api.messages.removeChatUser({ chat_id: msg.chatId, user_id: u.id });
 });
@@ -171,6 +182,7 @@ bot.hear(/^(?:!unban|!разбан)$/i, msg => {
   if (!u.ban) return getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${u.id}` + `(` + fullName + `) ` + `не забанен`));
 
   u.ban = false;
+  saveUser(u);
 
   getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${u.id}` + `(` + fullName + `) ` + `разбанен`));
 });
@@ -183,7 +195,10 @@ bot.hear(/^(?:!unwarn|!разварн|!унварн|!анварн)$/i, msg => {
   if (user.id == u.id) return msg.send("Че дебил сам себе варн давать");
   if (u.role >= user.role) return msg.send("Нельзя");
   if (u.warns <= 0) return getName(msg.replyMessage.senderId).then(fullName => msg.send(`У пользователя @id${u.id}` + `(` + fullName + `) ` + `нет предупреждений`));
+
   u.warns--;
+  saveUser(u);
+
   getName(msg.replyMessage.senderId).then(fullName => msg.send(`С пользователя @id${u.id}` + `(` + fullName + `) ` + `снято предупреждение [` + u.warns + `/3]`));
 });
 
