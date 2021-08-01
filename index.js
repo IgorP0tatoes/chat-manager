@@ -30,8 +30,8 @@ function getOrCreateUserDefault(id, peerId) {
   return getOrCreateUser(id, peerId, "", 1, false, 0, 0);
 }
 function getOrCreateUser(id, peerId, nick, role, ban, warns, messages) {
-  try { return users[peerId][id] }
-  catch { }
+  const loaded = tryGetLoadedUser(id, peerId);
+  if (loaded) return loaded;
 
   const count = getUserCountStatement.get(id, peerId);
   if (count["count()"] == 0)
@@ -43,13 +43,19 @@ function createUser(id, peerId, nick, role, ban, warns, messages) {
   return loadUser(id, peerId);
 }
 
-function getUser(id, peerId) {
+function tryGetLoadedUser(id, peerId){
   var peers = users[peerId];
   if (peers) {
     const user = peers[id];
     if (user)
       return user;
   }
+
+  return null;
+}
+function getUser(id, peerId) {
+  const loaded = tryGetLoadedUser(id, peerId);
+  if (loaded) return loaded;
 
   return getOrCreateUserDefault(id, peerId);
 }
