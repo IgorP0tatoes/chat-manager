@@ -18,12 +18,15 @@ db.transaction(() => {
   );
 })();
 
-const createUserStatement = db.prepare('insert into players (id, peerId, nick, role, ban, warns, messages) values (?,?,?,?,?,?,?)');
-const updateUserStatement = db.prepare('update players set nick=?, role=?, ban=?, warns=?, messages=? where id=? and peerId=?');
-const getUserCountStatement = db.prepare('select count() from players where id=? and peerId=?');
-const loadUserStatement = db.prepare('select * from players where id=? and peerId=?');
+const createUserStatement         = db.prepare('insert into players (id, peerId, nick, role, ban, warns, messages) values (?,?,?,?,?,?,?)');
+const updateUserStatement         = db.prepare('update players set nick=?, role=?, ban=?, warns=?, messages=? where id=? and peerId=?');
+const getUserCountStatement       = db.prepare('select count() from players where id=? and peerId=?');
+const getPeerUserCountStatement   = db.prepare('select count() from players where peerid=?');
+const loadUserStatement           = db.prepare('select * from players where id=? and peerId=?');
+const getBanlistStatement         = db.prepare('select * from players where peerid=? and ban=1');
 
 const users = [];
+
 
 
 function getOrCreateUserDefault(id, peerId) {
@@ -40,7 +43,17 @@ function getOrCreateUser(id, peerId, nick, role, ban, warns, messages) {
 }
 function createUser(id, peerId, nick, role, ban, warns, messages) {
   createUserStatement.run(id, peerId, nick, role, ban ? 1 : 0, warns, messages);
-  return loadUser(id, peerId);
+
+  const user = loadUser(id, peerId);
+  vk.api.messages.getConversationMembers({ peer_id: peerId }).then(x => {
+	console.log(x);
+    if (x.items.filter(x => x.member_id == user.id)[0].is_admin) {
+      user.role = 2;
+      saveUser(user);
+    }
+  });
+
+  return user;
 }
 
 function tryGetLoadedUser(id, peerId){
@@ -81,17 +94,17 @@ vk.updates.on('message', async (msg, context) => {
   const user = getUser(msg.senderId, msg.peerId);
   if (msg.senderId > 0) getName(msg.senderId).then(fullName => console.log("От @id" + msg.senderId + "(" + fullName + ") : " + msg.text));
 
-  if ((user.role == 1) && (msg.attachments.some(x => x instanceof StickerAttachment))) {
+  if ((user.role == 1) && (msg.peerId == 2000000003) && (msg.attachments.some(x => x instanceof StickerAttachment))) {
     user.warns++;
     saveUser(user);
     getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за стикер [` + user.warns + `/3]`));
   }
-  if ((user.role == 1) && (msg.attachments.some(x => x instanceof AudioMessageAttachment))) {
+  if ((user.role == 1) && (msg.peerId == 2000000003) && (msg.attachments.some(x => x instanceof AudioMessageAttachment))) {
     user.warns++;
     saveUser(user);
     getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за голосовое сообщение [` + user.warns + `/3]`));
   }
-  if ((user.role == 1) && (msg.attachments.some(x => x instanceof GraffitiAttachment))) {
+  if ((user.role == 1) && (msg.peerId == 2000000003) && (msg.attachments.some(x => x instanceof GraffitiAttachment))) {
     user.warns++;
     saveUser(user);
     getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за граффити [` + user.warns + `/3]`));
@@ -112,7 +125,7 @@ vk.updates.on('chat_invite_user', (msg, context) => {
   const user = getUser(msg.eventMemberId, msg.peerId);
   console.log(user);
   if (user.ban) {
-    msg.send(`Пользователь @id${user.id} забанен!`);
+    getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${u.id}` + `(` + fullName + `) ` + `забанен!`));
     vk.api.messages.removeChatUser({ chat_id: msg.chatId, user_id: user.id })
   }
   return context();
@@ -123,7 +136,7 @@ bot.hear(/^(?:!warn|!варн)$/i, (msg, next) => {
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
 
   if (user.role == 1) return msg.send("Нет прав");
-  if (user.id == u.id) return msg.send("Че дебил сам себе варн давать");
+  if (user.id == u.id) return msg.send("дурак чтоли самому себе варн давать");
   if (u.role >= user.role) return msg.send("Нельзя");
 
   u.warns++;
@@ -145,7 +158,7 @@ bot.hear(/^(?:!kick|!кик)$/i, msg => {
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
 
   if (user.role == 1) return msg.send("Нет прав");
-  if (user.id == u.id) return msg.send("Че дебил самого себя кикать");
+  if (user.id == u.id) return msg.send("дурак чтоли самого себя кикать");
   if (u.role >= user.role) return msg.send("Нельзя");
 
   u.warns = 0;
@@ -160,7 +173,7 @@ bot.hear(/^(?:!ban|!бан)$/i, msg => {
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
 
   if (user.role == 1) return msg.send("Нет прав");
-  if (user.id == u.id) return msg.send("Че дебил самого себя банить");
+  if (user.id == u.id) return msg.send("дурак чтоли самого себя банить");
   if (u.role >= user.role) return msg.send("Нельзя");
   if (u.ban) return getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${u.id}` + `(` + fullName + `) ` + `уже забанен`));;
 
@@ -202,7 +215,7 @@ bot.hear(/^(?:!unwarn|!разварн|!унварн|!анварн)$/i, msg => {
   getName(msg.replyMessage.senderId).then(fullName => msg.send(`С пользователя @id${u.id}` + `(` + fullName + `) ` + `снято предупреждение [` + u.warns + `/3]`));
 });
 
-bot.hear(/^(?:!report|!репорт)$/i, msg => {
+/* bot.hear(/^(?:!report|!репорт)$/i, msg => {
   const user = getUser(msg.senderId, msg.peerId);
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
 
@@ -223,29 +236,14 @@ bot.hear(/^(?:!report|!репорт)$/i, msg => {
     user_id: 467495261, message: `ало насьтя привет там репорт на @id${u.id}`, random_id: Math.floor(Math.random() * 2000000),
     peer_id: msg.peerId, forward: JSON.stringify({ peer_id: msg.peerId, conversation_message_ids: msg.conversationMessageId, is_reply: 0 })
   });
-});
+}); */
 
 bot.hear(/^(?:!stats|!стата|!статистика)$/i, msg => {
   const user = getUser(msg.senderId, msg.peerId);
-
   if (user.role == 1) return getName(msg.senderId).then(fullName => msg.send(`@id${user.id}` + `(` + fullName + `)\n` + `Количество варнов: ` + user.warns));
-  msg.send("Всего в базе беседы: " + users.filter(x => x.peerId == msg.peerId).length + " человек");
-});
 
-bot.hear(/^(?:!команды|!кмд)$/i, msg => {
-  const user = getUser(msg.senderId, msg.peerId);
-
-  if (user.role == 1) return msg.send("Нет прав");
-
-  msg.send(`Список команд:
-      !варн !warn - выдать предупреждение пользователю
-      !кик !kick - выгнать пользователя из беседы (есть возможность вернуть)
-      !бан !ban - забанить пользователя в беседе (при возврате будет авто-кик)
-      !разбан !unban - разбанить пользователя
-      !репорт !report - пожаловаться на пользователя
-      !стата !статистика !stats - посмотреть статистику
-      !разварн !анварн !унварн !unwarn - снять предупреждение с пользователя
-      !изнас !iznas - изнасиловать пользователя`);
+  const count = getPeerUserCountStatement.get(msg.peerId);
+  msg.send("Всего в базе беседы: " + count["count()"] + " человек");
 });
 
 bot.hear(/^(?:!id|!ид|!айди)$/i, (msg, gey) => {
@@ -256,7 +254,6 @@ bot.hear(/^(?:!id|!ид|!айди)$/i, (msg, gey) => {
   if (user.role == 1) return msg.send("Нет прав");
   getId = msg.replyMessage.conversationMessageId;
   msg.send(getId);
-
 });
 
 bot.hear(/^(?:!изнас|!iznas)$/i, async msg => {
@@ -268,19 +265,49 @@ bot.hear(/^(?:!изнас|!iznas)$/i, async msg => {
   msg.send(`@id${u.id}` + `(` + replyName + `) ` + `был изнасилован игроком @id${user.id}` + `(` + senderName + `)`);
 });
 
-bot.hear(/^(?:ты)$/i, msg => {
-  vk.api.messages.send({
-    message: "нет ты", random_id: Math.floor(Math.random() * 2000000),
-    peer_id: msg.peerId, forward: JSON.stringify({ peer_id: msg.peerId, conversation_message_ids: msg.conversationMessageId, is_reply: 1 })
-  });
+bot.hear(/^(?:!админ|!адм|!admin)$/i, async msg => {
+  const user = getUser(msg.senderId, msg.peerId);
+  const u = getUser(msg.replyMessage.senderId, msg.peerId);
+  const replyName = await getName(msg.replyMessage.senderId);
+
+  if (user.role == 1) return msg.send("Нет прав");
+  if (user.id == u.id) return msg.send("дурак чтоли админку с себя снимать");
+  if (u.role == 1) {
+    u.role = 2;
+    saveUser(u);
+    return msg.send(`Пользователю @id${u.id}` + `(` + replyName + `) ` + `выдана админка`);
+  }
+  if (u.role == 2) {
+    u.role = 1;
+    saveUser(u);
+    return msg.send(`У пользователя @id${u.id}` + `(` + replyName + `) ` + `забрана админка`);
+  }
 });
 
 bot.hear(/^(?:!banlist|!банлист)$/i, async msg => {
-  const banned = users.filter(x => x.ban && x.peerId == msg.peerId).map(x => x.id);
+  const banned = getBanlistStatement.all(msg.peerId).map(x => x.id);
   const names = await getNames(banned);
 
   msg.send(banned.map((x, i) => "@id" + x + " (" + names[i] + ")").join(", ") +
     "\n Всего забанено: " + banned.length + " человек");
+});
+
+bot.hear(/^(?:!команды|!кмд)$/i, msg => {
+  const user = getUser(msg.senderId, msg.peerId);
+
+  if (user.role == 1) return msg.send("Нет прав");
+
+  msg.send(`Список команд:
+      !кмд !команды - список команд
+      !варн !warn - выдать предупреждение пользователю
+      !кик !kick - выгнать пользователя из беседы (есть возможность вернуть)
+      !бан !ban - забанить пользователя в беседе (при возврате будет авто-кик)
+      !разбан !unban - разбанить пользователя
+      !стата !статистика !stats - посмотреть статистику
+      !разварн !анварн !унварн !unwarn - снять предупреждение с пользователя
+      !изнас !iznas - изнасиловать пользователя
+      !ид !айди !is - получить conversationId сообщения
+      !адм !админ !admin - выбрать/забрать админку`);
 });
 
 console.log("started");
