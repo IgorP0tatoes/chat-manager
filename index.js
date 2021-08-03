@@ -1,10 +1,10 @@
 const { VK, StickerAttachment, AudioMessageAttachment, GraffitiAttachment } = require('vk-io');
 const { HearManager } = require('@vk-io/hear')
 const vk = new VK({
-  token: "0caad84d388e4bed5d8c53776124f92edfb972bc7a4597832fab6630ccdc8e94843cd49ad7d4f9c9a9de3",
+  token: "df0b404c1b73e72493799f9967f4854d6671e291e9e9c9b8614fd507294eb0371cc7ffa541593bf41caf6",
 });
-const bot = new HearManager();
-var db = require('better-sqlite3')('database.db', { verbose: console.log });
+const bot = new HearManager();    
+var db = require('better-sqlite3')('database.db');
 db.transaction(() => {
   db.exec(
     `create table if not exists players (
@@ -46,10 +46,11 @@ function createUser(id, peerId, nick, role, ban, warns, messages) {
 
   const user = loadUser(id, peerId);
   vk.api.messages.getConversationMembers({ peer_id: peerId }).then(x => {
-	console.log(x);
+    console.log(x.items);
     if (x.items.filter(x => x.member_id == user.id)[0].is_admin) {
       user.role = 2;
       saveUser(user);
+       if (user.id > 0) vk.api.messages.send({ message: `Выдача админ-прав прошла успешно`, random_id: Math.floor(Math.random() * 2000000), peer_id: user.peerId });
     }
   });
 
@@ -92,19 +93,21 @@ async function getName(userid) {
 
 vk.updates.on('message', async (msg, context) => {
   const user = getUser(msg.senderId, msg.peerId);
-  if (msg.senderId > 0) getName(msg.senderId).then(fullName => console.log("От @id" + msg.senderId + "(" + fullName + ") : " + msg.text));
+  if (msg.senderId > 0) getName(msg.senderId).then(fullName => console.log("От @id" + msg.senderId +  "(" + fullName + ") | " + msg.peerId + " | " + msg.text));
 
-  if ((user.role == 1) && (msg.peerId == 2000000003) && (msg.attachments.some(x => x instanceof StickerAttachment))) {
+  user.messages++;
+
+  if ((user.role == 1) && (msg.peerId == 2000000001) && (msg.attachments.some(x => x instanceof StickerAttachment))) {
     user.warns++;
     saveUser(user);
     getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за стикер [` + user.warns + `/3]`));
   }
-  if ((user.role == 1) && (msg.peerId == 2000000003) && (msg.attachments.some(x => x instanceof AudioMessageAttachment))) {
+  if ((user.role == 1) && (msg.peerId == 2000000001) && (msg.attachments.some(x => x instanceof AudioMessageAttachment))) {
     user.warns++;
     saveUser(user);
     getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за голосовое сообщение [` + user.warns + `/3]`));
   }
-  if ((user.role == 1) && (msg.peerId == 2000000003) && (msg.attachments.some(x => x instanceof GraffitiAttachment))) {
+  if ((user.role == 1) && (msg.peerId == 2000000001) && (msg.attachments.some(x => x instanceof GraffitiAttachment))) {
     user.warns++;
     saveUser(user);
     getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за граффити [` + user.warns + `/3]`));
@@ -307,7 +310,7 @@ bot.hear(/^(?:!команды|!кмд)$/i, msg => {
       !разварн !анварн !унварн !unwarn - снять предупреждение с пользователя
       !изнас !iznas - изнасиловать пользователя
       !ид !айди !is - получить conversationId сообщения
-      !адм !админ !admin - выбрать/забрать админку`);
+      !адм !админ !admin - выдать/забрать админку`);
 });
 
 console.log("started");
