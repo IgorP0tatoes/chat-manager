@@ -3,8 +3,11 @@ const { HearManager } = require('@vk-io/hear')
 const vk = new VK({
   token: "df0b404c1b73e72493799f9967f4854d6671e291e9e9c9b8614fd507294eb0371cc7ffa541593bf41caf6",
 });
-const bot = new HearManager();    
+const bot = new HearManager();
 var db = require('better-sqlite3')('database.db');
+
+//#region db
+
 db.transaction(() => {
   db.exec(
     `create table if not exists players (
@@ -16,71 +19,139 @@ db.transaction(() => {
     warns        integer not null default 1,
     messages     integer not null default 0)`
   );
+  db.exec(
+    `create table if not exists settings (
+    peerId       integer not null primary key unique,
+    photo        boolean not null default false,
+    video        boolean not null default false,
+    audio        boolean not null default false,
+    graffiti     boolean not null default false,
+    sticker      boolean not null default false,
+    audiomsg     boolean not null default false,
+    poll         boolean not null default false)`
+  );
 })();
 
-const createUserStatement         = db.prepare('insert into players (id, peerId, nick, role, ban, warns, messages) values (?,?,?,?,?,?,?)');
-const updateUserStatement         = db.prepare('update players set nick=?, role=?, ban=?, warns=?, messages=? where id=? and peerId=?');
-const getUserCountStatement       = db.prepare('select count() from players where id=? and peerId=?');
-const getPeerUserCountStatement   = db.prepare('select count() from players where peerid=?');
-const loadUserStatement           = db.prepare('select * from players where id=? and peerId=?');
-const getBanlistStatement         = db.prepare('select * from players where peerid=? and ban=1');
+const idKeys                    = ['id', 'peerId'];
+
+const userKeys                  = Object.keys(userInstance(0, 0));
+const userKeysNoIds             = userKeys.filter(x => !idKeys.includes(x));
+
+const settingsKeys              = Object.keys(settingsInstance(0, 0));
+const settingsKeysNoIds         = settingsKeys.filter(x => !idKeys.includes(x));
+
+const createUserStatement       = db.prepare('insert into players (' + userKeys.join(", ") + ') values (' + userKeys.map(x => '?').join(", ") + ')');
+const updateUserStatement       = db.prepare('update players set ' + userKeysNoIds.map(x => x + "=?").join(", ") + ' where id=? and peerId=?');
+const getUserCountStatement     = db.prepare('select count() from players where id=? and peerId=?');
+const getPeerUserCountStatement = db.prepare('select count() from players where peerid=?');
+const loadUserStatement         = db.prepare('select * from players where id=? and peerId=?');
+const getBanlistStatement       = db.prepare('select * from players where peerid=? and ban=1');
+
+const loadSettingsStatement     = db.prepare('select * from settings where peerid=?');
+const createSettingsStatement   = db.prepare('insert into settings (' + settingsKeys.join(", ") + ') values (' + settingsKeys.map(x => '?').join(", ") + ')');
+const updateSettingsStatement   = db.prepare('update settings set ' + settingsKeysNoIds.map(x => x + "=?").join(", ") + ' where peerId=?');
+const getSettingsCountStatement = db.prepare('select count() from settings where peerId=?');
 
 const users = [];
+const settings = [];
 
 
+function mapObjectValue(value) {
+  if (value === true) return 1;
+  if (value === false) return 0;
 
-function getOrCreateUserDefault(id, peerId) {
-  return getOrCreateUser(id, peerId, "", 1, false, 0, 0);
+  return value;
 }
-function getOrCreateUser(id, peerId, nick, role, ban, warns, messages) {
-  const loaded = tryGetLoadedUser(id, peerId);
-  if (loaded) return loaded;
 
-  const count = getUserCountStatement.get(id, peerId);
-  if (count["count()"] == 0)
-    return createUser(id, peerId, nick, role, ban, warns, messages);
-  return loadUser(id, peerId);
+//#region  settings
+
+function settingsInstance(pid) {
+  return {
+    peerId:   pid,
+    photo:    false,
+    video:    false,
+    audio:    false,
+    graffiti: false,
+    sticker:  false,
+    audiomsg: false,
+    poll:     false
+  };
 }
-function createUser(id, peerId, nick, role, ban, warns, messages) {
-  createUserStatement.run(id, peerId, nick, role, ban ? 1 : 0, warns, messages);
+function getSettings(peerId) {
+  return settings[peerId] || getOrCreateSettings(peerId);
 
-  const user = loadUser(id, peerId);
-  vk.api.messages.getConversationMembers({ peer_id: peerId }).then(x => {
-    console.log(x.items);
-    if (x.items.filter(x => x.member_id == user.id)[0].is_admin) {
-      user.role = 2;
-      saveUser(user);
-       if (user.id > 0) vk.api.messages.send({ message: `Выдача админ-прав прошла успешно`, random_id: Math.floor(Math.random() * 2000000), peer_id: user.peerId });
+
+  function getOrCreateSettings(peerId) {
+    const count = getSettingsCountStatement.get(peerId);
+    if (count["count()"] == 0)
+      return createSettings(settingsInstance(peerId));
+
+      return settings[peerId] = loadSettingsStatement.get(peerId);
+
+
+    function createSettings(settings) {
+      createSettingsStatement.run(Object.values(settings).map(mapObjectValue));
+      return peerId;
     }
-  });
+  }
+}
+function saveSettings(settings) {
+  const values = settingsKeysNoIds.map(x => mapObjectValue(settings[x]));
+  values.push(settings.peerId);
 
-  return user;
+  updateSettingsStatement.run(values);
 }
 
-function tryGetLoadedUser(id, peerId){
-  var peers = users[peerId];
-  if (peers) {
-    const user = peers[id];
-    if (user)
-      return user;
-  }
+//#endregion
 
-  return null;
+
+function userInstance(uid, pid) {
+  return {
+    id: uid,
+    peerId: pid,
+    warns: 0,
+    role: 1,
+    ban: false,
+    nick: '',
+    messages: 0,
+  };
 }
 function getUser(id, peerId) {
-  const loaded = tryGetLoadedUser(id, peerId);
-  if (loaded) return loaded;
+  return users[peerId]?.[id] || getOrCreateUser(id, peerId);
 
-  return getOrCreateUserDefault(id, peerId);
-}
-function loadUser(id, peerId) {
-  if (!users[peerId]) users[peerId] = [];
-  return users[peerId][id] = loadUserStatement.get(id, peerId);
-}
 
+  function getOrCreateUser(id, peerId) {
+    const count = getUserCountStatement.get(id, peerId);
+    if (count["count()"] == 0)
+      return createUser(userInstance(id, peerId));
+
+    users[peerId] ??= [];
+    return users[peerId][id] = loadUserStatement.get(id, peerId);
+
+
+    function createUser(user) {
+      createUserStatement.run(Object.values(user).map(mapObjectValue));
+
+      vk.api.messages.getConversationMembers({ peer_id: user.peerId }).then(x => {
+        if (x.items.filter(x => x.member_id == user.id)?.[0]?.is_admin || false) {
+          user.role = 2;
+          saveUser(user);
+          if (user.id > 0) vk.api.messages.send({ message: `Выдача админ-прав прошла успешно`, random_id: Math.floor(Math.random() * 2000000), peer_id: user.peerId });
+        }
+      });
+      return user;
+    }
+  }
+}
 function saveUser(user) {
-  updateUserStatement.run(user.nick, user.role, user.ban, user.warns, user.messages, user.id, user.peerId);
+  const values = userKeysNoIds.map(x => mapObjectValue(user[x]));
+  values.push(user.id);
+  values.push(user.peerId);
+
+  updateUserStatement.run(values);
 }
+
+//#endregion
 
 
 async function getNames(userids) {
@@ -93,7 +164,7 @@ async function getName(userid) {
 
 vk.updates.on('message', async (msg, context) => {
   const user = getUser(msg.senderId, msg.peerId);
-  if (msg.senderId > 0) getName(msg.senderId).then(fullName => console.log("От @id" + msg.senderId +  "(" + fullName + ") | " + msg.peerId + " | " + msg.text));
+  if (msg.senderId > 0) getName(msg.senderId).then(fullName => console.log("От @id" + msg.senderId + "(" + fullName + ") | " + msg.peerId + " | " + msg.text));
 
   user.messages++;
 
@@ -126,7 +197,6 @@ vk.updates.on('message', bot.middleware);
 
 vk.updates.on('chat_invite_user', (msg, context) => {
   const user = getUser(msg.eventMemberId, msg.peerId);
-  console.log(user);
   if (user.ban) {
     getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${u.id}` + `(` + fullName + `) ` + `забанен!`));
     vk.api.messages.removeChatUser({ chat_id: msg.chatId, user_id: user.id })
@@ -241,9 +311,12 @@ bot.hear(/^(?:!unwarn|!разварн|!унварн|!анварн)$/i, msg => {
   });
 }); */
 
-bot.hear(/^(?:!stats|!стата|!статистика)$/i, msg => {
-  const user = getUser(msg.senderId, msg.peerId);
-  if (user.role == 1) return getName(msg.senderId).then(fullName => msg.send(`@id${user.id}` + `(` + fullName + `)\n` + `Количество варнов: ` + user.warns));
+bot.hear(/^(?:!stats|!стата|!статистика) ?.*$/i, msg => {
+  const spt = msg.text.split(' ');
+  const id = spt[1] || msg.senderId;
+
+  const user = getUser(id, msg.peerId);
+  if (user.role == 1) return getName(user.id).then(fullName => msg.send(`@id${user.id}` + `(` + fullName + `)\n` + `Количество варнов: ` + user.warns));
 
   const count = getPeerUserCountStatement.get(msg.peerId);
   msg.send("Всего в базе беседы: " + count["count()"] + " человек");
@@ -293,6 +366,29 @@ bot.hear(/^(?:!banlist|!банлист)$/i, async msg => {
 
   msg.send(banned.map((x, i) => "@id" + x + " (" + names[i] + ")").join(", ") +
     "\n Всего забанено: " + banned.length + " человек");
+});
+
+bot.hear(/^(?:!настройки) ?.*$/i, msg => {
+  const spt = msg.text.split(' ');
+  const user = getUser(msg.senderId, msg.peerId);
+  const settings = getSettings(msg.peerId);
+  var type;
+
+  if (user.role == 1) return msg.send("Нет прав");
+  if (spt[1] == null) return msg.send("Использование: !настройки фото/видео/аудио/стикеры/голосовые/документы/граффити/опросы" + "\nОписание: Запрещает/разрешает присылать медиа");
+  else if (spt[1] == "фото")      type = "photo";
+  else if (spt[1] == "видео")     type = "video";
+  else if (spt[1] == "аудио")     type = "audio";
+  else if (spt[1] == "стикеры")   type = "sticker";
+  else if (spt[1] == "голосовые") type = "audiomsg";
+  else if (spt[1] == "документы") type = "document";
+  else if (spt[1] == "граффити")  type = "graffiti";
+  else if (spt[1] == "опросы")    type = "poll";
+  // <.........>
+
+  settings[type] = !settings[type];
+  saveSettings(settings);
+  msg.send(spt[1] + (settings[type] ? " разрешено" : " запрещено"));
 });
 
 bot.hear(/^(?:!команды|!кмд)$/i, msg => {
