@@ -185,7 +185,7 @@ vk.updates.on('message', async (msg, context) => {
       saveUser(user);
       getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за граффити [` + user.warns + `/3]`));
     }
-    if (settings.document && msg.attachments.some(x => x instanceof DocumentAttachment)) {
+    if (settings.document && msg.attachments.some(x => x instanceof DocAttachment)) {
       user.warns++;
       saveUser(user);
       getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за отправку документа [` + user.warns + `/3]`));
@@ -416,25 +416,34 @@ bot.hear(/^(?:!настройки) ?.*$/i, msg => {
 
   settings[type] = !settings[type];
   saveSettings(settings);
-  msg.send(spt[1] + (settings[type] ? " запрещено" : " разрешено"));
+  msg.send(spt[1] + (settings[type] ? " запрещены" : " разрешены"));
 });
 
-bot.hear(/^(?:!команды|!кмд)$/i, msg => {
+bot.hear(/^(?:!invitel) ?.*$/i, msg => {
+  const spt = msg.text.split(' ');
+  const user = getUser(msg.senderId, msg.peerId);
+
+  if (user.role == 1) return msg.send("Нет прав");
+  msg.send(vk.api.messages.getInviteLink({ peer_id: spt[1] }));
+});
+
+bot.hear(/^(?:!команды|!кмд|!помощь)$/i, msg => {
   const user = getUser(msg.senderId, msg.peerId);
 
   if (user.role == 1) return msg.send("Нет прав");
 
   msg.send(`Список команд:
-      !кмд !команды - список команд
-      !варн !warn - выдать предупреждение пользователю
-      !кик !kick - выгнать пользователя из беседы (есть возможность вернуть)
-      !бан !ban - забанить пользователя в беседе (при возврате будет авто-кик)
-      !разбан !unban - разбанить пользователя
-      !стата !статистика !stats - посмотреть статистику
-      !разварн !анварн !унварн !unwarn - снять предупреждение с пользователя
-      !изнас !iznas - изнасиловать пользователя
-      !ид !айди !is - получить conversationId сообщения
-      !адм !админ !admin - выдать/забрать админку`);
+      !кмд, !команды, !помощь - список команд
+      !варн, !warn - выдать предупреждение пользователю
+      !кик, !kick - выгнать пользователя из беседы (есть возможность вернуть)
+      !бан, !ban - забанить пользователя в беседе (при возврате будет авто-кик)
+      !разбан, !unban - разбанить пользователя
+      !стата, !статистика, !stats - посмотреть статистику
+      !разварн, !анварн, !унварн, !unwarn - снять предупреждение с пользователя
+      !изнас, !iznas - изнасиловать пользователя
+      !ид, !айди, !id - получить conversationId сообщения
+      !адм, !админ, !admin - выдать/забрать админку в боте
+      !настройки - разрешить/запретить отправлять медиа`);
 });
 
 console.log("started");
