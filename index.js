@@ -1,4 +1,5 @@
-const { VK, StickerAttachment, AudioMessageAttachment, GraffitiAttachment } = require('vk-io');
+const { VK, StickerAttachment, AudioMessageAttachment, GraffitiAttachment, DocAttachment,
+  PhotoAttachment, VideoAttachment, AudioAttachment, PollAttachment } = require('vk-io');
 const { HearManager } = require('@vk-io/hear')
 const vk = new VK({
   token: "df0b404c1b73e72493799f9967f4854d6671e291e9e9c9b8614fd507294eb0371cc7ffa541593bf41caf6",
@@ -169,6 +170,7 @@ vk.updates.on('message', async (msg, context) => {
   if (msg.senderId > 0) getName(msg.senderId).then(fullName => console.log(msg.peerId + " | " + msg.senderId + " | " + fullName + ": " + msg.text));
   user.messages++;
   saveUser(user);
+  if (msg.senderId == msg.peerId) msg.send("Привет! Как добавить бота в свою беседу можешь посмотреть здесь - https://vk.com/wall-206245485_2")
   if (user.role == 1) {
     if (settings.sticker && msg.attachments.some(x => x instanceof StickerAttachment)) {
       user.warns++;
@@ -339,16 +341,16 @@ bot.hear(/^(?:!unwarn|!разварн|!унварн|!анварн)$/i, msg => {
   });
 }); */
 
-bot.hear(/^(?:!stats|!стата|!статистика) ?.*$/i, msg => {
+bot.hear(/^(?:!stats|!стата|!статистика|!профиль) ?.*$/i, msg => {
   const spt = msg.text.split(' ');
   const id = spt[1] || msg.senderId;
 
   const user = getUser(id, msg.peerId);
-  if (user.role == 1) return getName(user.id).then(fullName => msg.send(`@id${user.id}` + `(` + fullName + `)\n` + `Количество варнов: ` + user.warns +
-     "\nВсего сообщений: " + user.messages));
+  if (user.role == 1) return getName(user.id).then(fullName => msg.send(`@id${user.id}` + `(` + fullName + `)` +
+     `\nНик: ` + user.nick + `\nКоличество варнов: ` + user.warns + `\nВсего сообщений: ` + user.messages));
 
   const count = getPeerUserCountStatement.get(msg.peerId);
-  msg.send("Всего в базе беседы: " + count["count()"] + " человек" + "\nВсего сообщений: " + user.messages);
+  msg.send("Ник: " + user.nick + "\nВсего в базе беседы: " + count["count()"] + " человек" + "\nВсего сообщений: " + user.messages);
 });
 
 bot.hear(/^(?:!id|!ид|!айди)$/i, (msg, gey) => {
@@ -368,6 +370,7 @@ bot.hear(/^(?:!изнас|!iznas)$/i, async msg => {
   const senderName = await getName(msg.senderId);
   const replyName = await getName(msg.replyMessage.senderId);
   msg.send(`@id${u.id}` + `(` + replyName + `) ` + `был изнасилован игроком @id${user.id}` + `(` + senderName + `)`);
+
 });
 
 bot.hear(/^(?:!админ|!адм|!admin)$/i, async msg => {
@@ -404,7 +407,18 @@ bot.hear(/^(?:!настройки) ?.*$/i, msg => {
   var type;
 
   if (user.role == 1) return msg.send("Нет прав");
-  if (spt[1] == null) return msg.send("Использование: !настройки фото/видео/аудио/стикеры/голосовые/документы/граффити/опросы" + "\n\nОписание: Запрещает/разрешает присылать медиа");
+  if (spt[1] == null) return msg.send("Использование: !настройки <все/фото/видео/аудио/стикеры/голосовые/документы/граффити/опросы>" + 
+    "\n\nОписание: Запрещает/разрешает присылать медиа");
+  if (spt[1] == ("все" || "всё")) {
+    settings.photo    = !settings.photo;
+    settings.video    = !settings.video;
+    settings.audio    = !settings.audio;
+    settings.sticker  = !settings.sticker;
+    settings.audiomsg = !settings.audiomsg;
+    settings.document = !settings.document;
+    settings.graffiti = !settings.graffiti;
+    settings.poll     = !settings.poll;
+  }
   else if (spt[1] == "фото")      type = "photo";
   else if (spt[1] == "видео")     type = "video";
   else if (spt[1] == "аудио")     type = "audio";
@@ -413,6 +427,7 @@ bot.hear(/^(?:!настройки) ?.*$/i, msg => {
   else if (spt[1] == "документы") type = "document";
   else if (spt[1] == "граффити")  type = "graffiti";
   else if (spt[1] == "опросы")    type = "poll";
+  else return msg.send("Неизвестный параметр");
 
   settings[type] = !settings[type];
   saveSettings(settings);
@@ -427,23 +442,45 @@ bot.hear(/^(?:!invitel) ?.*$/i, msg => {
   msg.send(vk.api.messages.getInviteLink({ peer_id: spt[1] }));
 });
 
+bot.hear(/^(?:!ник|!nick) ?.*$/i, msg => {
+  const spt = msg.text.split(' ');
+  const user = getUser(msg.senderId, msg.peerId);
+
+  if (spt[1] == null) return msg.send("Использование: !ник <ник>\n" + "Описание: установить себе никнейм");
+  if (spt[1].length > 20) {
+    user.nick = null;
+    return msg.send("Ошибка: макс. длина ника 20 символов");
+  }
+  user.nick = spt[1];
+  saveUser(user);
+  getName(msg.senderId).then(fullName =>  msg.send(`Установлен ник "` + user.nick + `" для пользователя @id${user.id} (` + fullName + `)`));
+});
+
 bot.hear(/^(?:!команды|!кмд|!помощь)$/i, msg => {
   const user = getUser(msg.senderId, msg.peerId);
 
-  if (user.role == 1) return msg.send("Нет прав");
+  if (user.role == 1) return msg.send(`
+     Список команд:
+     !ник, !nick - установить себе ник      
+     !стата, !статистика, !профиль, !stats - посмотреть статистику `);
 
-  msg.send(`Список команд:
+  msg.send(`
+      Помощь:
+      Чтоб выдать варн/кик/бан необходимо ответить на сообщение пользователя, которому нужно выдать варн/кик/бан 
+
+      Список команд:
       !кмд, !команды, !помощь - список команд
       !варн, !warn - выдать предупреждение пользователю
       !кик, !kick - выгнать пользователя из беседы (есть возможность вернуть)
       !бан, !ban - забанить пользователя в беседе (при возврате будет авто-кик)
       !разбан, !unban - разбанить пользователя
-      !стата, !статистика, !stats - посмотреть статистику
+      !стата, !статистика, !профиль, !stats - посмотреть статистику
       !разварн, !анварн, !унварн, !unwarn - снять предупреждение с пользователя
       !изнас, !iznas - изнасиловать пользователя
       !ид, !айди, !id - получить conversationId сообщения
       !адм, !админ, !admin - выдать/забрать админку в боте
-      !настройки - разрешить/запретить отправлять медиа`);
+      !настройки - разрешить/запретить отправлять медиа
+      !ник, !nick - установить себе ник`);
 });
 
 console.log("started");
