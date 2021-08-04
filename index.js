@@ -28,7 +28,8 @@ db.transaction(() => {
     graffiti     boolean not null default false,
     sticker      boolean not null default false,
     audiomsg     boolean not null default false,
-    poll         boolean not null default false)`
+    poll         boolean not null default false,
+    document     boolean not null default false)`
   );
 })();
 
@@ -74,7 +75,8 @@ function settingsInstance(pid) {
     graffiti: false,
     sticker:  false,
     audiomsg: false,
-    poll:     false
+    poll:     false,
+    document: false,
   };
 }
 function getSettings(peerId) {
@@ -103,7 +105,6 @@ function saveSettings(settings) {
 }
 
 //#endregion
-
 
 function userInstance(uid, pid) {
   return {
@@ -164,27 +165,54 @@ async function getName(userid) {
 
 vk.updates.on('message', async (msg, context) => {
   const user = getUser(msg.senderId, msg.peerId);
-  if (msg.senderId > 0) getName(msg.senderId).then(fullName => console.log("От @id" + msg.senderId + "(" + fullName + ") | " + msg.peerId + " | " + msg.text));
-
+  const settings = getSettings(msg.peerId);
+  if (msg.senderId > 0) getName(msg.senderId).then(fullName => console.log(msg.peerId + " | " + msg.senderId + " | " + fullName + ": " + msg.text));
   user.messages++;
-
-  if ((user.role == 1) && (msg.peerId == 2000000001) && (msg.attachments.some(x => x instanceof StickerAttachment))) {
-    user.warns++;
-    saveUser(user);
-    getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за стикер [` + user.warns + `/3]`));
-  }
-  if ((user.role == 1) && (msg.peerId == 2000000001) && (msg.attachments.some(x => x instanceof AudioMessageAttachment))) {
-    user.warns++;
-    saveUser(user);
-    getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за голосовое сообщение [` + user.warns + `/3]`));
-  }
-  if ((user.role == 1) && (msg.peerId == 2000000001) && (msg.attachments.some(x => x instanceof GraffitiAttachment))) {
-    user.warns++;
-    saveUser(user);
-    getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за граффити [` + user.warns + `/3]`));
+  saveUser(user);
+  if (user.role == 1) {
+    if (settings.sticker && msg.attachments.some(x => x instanceof StickerAttachment)) {
+      user.warns++;
+      saveUser(user);
+      getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за стикер [` + user.warns + `/3]`));
+    }
+    if (settings.audiomsg && msg.attachments.some(x => x instanceof AudioMessageAttachment)) {
+      user.warns++;
+      saveUser(user);
+      getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за голосовое сообщение [` + user.warns + `/3]`));
+    }
+    if (settings.graffiti && msg.attachments.some(x => x instanceof GraffitiAttachment)) {
+      user.warns++;
+      saveUser(user);
+      getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за граффити [` + user.warns + `/3]`));
+    }
+    if (settings.document && msg.attachments.some(x => x instanceof DocumentAttachment)) {
+      user.warns++;
+      saveUser(user);
+      getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за отправку документа [` + user.warns + `/3]`));
+    }
+    if (settings.photo && msg.attachments.some(x => x instanceof PhotoAttachment)) {
+      user.warns++;
+      saveUser(user);
+      getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за фото [` + user.warns + `/3]`));
+    }
+    if (settings.video && msg.attachments.some(x => x instanceof VideoAttachment)) {
+      user.warns++;
+      saveUser(user);
+      getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за видео [` + user.warns + `/3]`));
+    }
+    if (settings.audio && msg.attachments.some(x => x instanceof AudioAttachment)) {
+      user.warns++;
+      saveUser(user);
+      getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за аудио [` + user.warns + `/3]`));
+    }
+    if (settings.poll && msg.attachments.some(x => x instanceof PollAttachment)) {
+      user.warns++;
+      saveUser(user);
+      getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за создание опроса [` + user.warns + `/3]`));
+    }
   }
   if (user.warns == 3) {
-    msg.send("Три варна, бб");
+    getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил третье предупреждение и был кикнут`));
     user.warns = 0;
     saveUser(user);
     vk.api.messages.removeChatUser({ chat_id: msg.chatId, user_id: user.id });
@@ -217,7 +245,7 @@ bot.hear(/^(?:!warn|!варн)$/i, (msg, next) => {
   getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${u.id}` + `(` + fullName + `) ` + `получил предупреждение [` + u.warns + `/3]`));
 
   if (u.warns == 3) {
-    msg.send("Три варна, бб");
+    getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил третье предупреждение и был кикнут`));
     u.warns = 0;
     vk.api.messages.removeChatUser({ chat_id: msg.chatId, user_id: u.id });
     saveUser(u);
@@ -316,10 +344,11 @@ bot.hear(/^(?:!stats|!стата|!статистика) ?.*$/i, msg => {
   const id = spt[1] || msg.senderId;
 
   const user = getUser(id, msg.peerId);
-  if (user.role == 1) return getName(user.id).then(fullName => msg.send(`@id${user.id}` + `(` + fullName + `)\n` + `Количество варнов: ` + user.warns));
+  if (user.role == 1) return getName(user.id).then(fullName => msg.send(`@id${user.id}` + `(` + fullName + `)\n` + `Количество варнов: ` + user.warns +
+     "\nВсего сообщений: " + user.messages));
 
   const count = getPeerUserCountStatement.get(msg.peerId);
-  msg.send("Всего в базе беседы: " + count["count()"] + " человек");
+  msg.send("Всего в базе беседы: " + count["count()"] + " человек" + "\nВсего сообщений: " + user.messages);
 });
 
 bot.hear(/^(?:!id|!ид|!айди)$/i, (msg, gey) => {
@@ -361,7 +390,7 @@ bot.hear(/^(?:!админ|!адм|!admin)$/i, async msg => {
 });
 
 bot.hear(/^(?:!banlist|!банлист)$/i, async msg => {
-  const banned = getBanlistStatement.all(msg.peerId).map(x => x.id);
+  const banned = getMessagesStatement.all(msg.peerId);
   const names = await getNames(banned);
 
   msg.send(banned.map((x, i) => "@id" + x + " (" + names[i] + ")").join(", ") +
@@ -375,7 +404,7 @@ bot.hear(/^(?:!настройки) ?.*$/i, msg => {
   var type;
 
   if (user.role == 1) return msg.send("Нет прав");
-  if (spt[1] == null) return msg.send("Использование: !настройки фото/видео/аудио/стикеры/голосовые/документы/граффити/опросы" + "\nОписание: Запрещает/разрешает присылать медиа");
+  if (spt[1] == null) return msg.send("Использование: !настройки фото/видео/аудио/стикеры/голосовые/документы/граффити/опросы" + "\n\nОписание: Запрещает/разрешает присылать медиа");
   else if (spt[1] == "фото")      type = "photo";
   else if (spt[1] == "видео")     type = "video";
   else if (spt[1] == "аудио")     type = "audio";
@@ -384,11 +413,10 @@ bot.hear(/^(?:!настройки) ?.*$/i, msg => {
   else if (spt[1] == "документы") type = "document";
   else if (spt[1] == "граффити")  type = "graffiti";
   else if (spt[1] == "опросы")    type = "poll";
-  // <.........>
 
   settings[type] = !settings[type];
   saveSettings(settings);
-  msg.send(spt[1] + (settings[type] ? " разрешено" : " запрещено"));
+  msg.send(spt[1] + (settings[type] ? " запрещено" : " разрешено"));
 });
 
 bot.hear(/^(?:!команды|!кмд)$/i, msg => {
