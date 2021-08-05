@@ -1,9 +1,9 @@
 const { VK, StickerAttachment, AudioMessageAttachment, GraffitiAttachment, DocAttachment,
   PhotoAttachment, VideoAttachment, AudioAttachment, PollAttachment } = require('vk-io');
-const { HearManager } = require('@vk-io/hear')
-const vk = new VK({
-  token: "df0b404c1b73e72493799f9967f4854d6671e291e9e9c9b8614fd507294eb0371cc7ffa541593bf41caf6",
-});
+const { HearManager } = require('@vk-io/hear');
+const fs = require('fs');
+let config = require('./config.json');
+const vk = new VK({ token: config.token });
 const bot = new HearManager();
 var db = require('better-sqlite3')('database.db');
 
@@ -30,7 +30,8 @@ db.transaction(() => {
     sticker      boolean not null default false,
     audiomsg     boolean not null default false,
     poll         boolean not null default false,
-    document     boolean not null default false)`
+    document     boolean not null default false,
+    adminsId     text not null default "")`
   );
 })();
 
@@ -78,6 +79,7 @@ function settingsInstance(pid) {
     audiomsg: false,
     poll:     false,
     document: false,
+    adminsId: "",
   };
 }
 function getSettings(peerId) {
@@ -365,12 +367,28 @@ bot.hear(/^(?:!id|!ид|!айди)$/i, (msg, gey) => {
 
 bot.hear(/^(?:!изнас|!iznas)$/i, async msg => {
   const user = getUser(msg.senderId, msg.peerId);
-  if (user.role == 1) return msg.send("Нет прав");
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
   const senderName = await getName(msg.senderId);
   const replyName = await getName(msg.replyMessage.senderId);
-  msg.send(`@id${u.id}` + `(` + replyName + `) ` + `был изнасилован игроком @id${user.id}` + `(` + senderName + `)`);
+  const leftnick = u.nick == "" ? replyName : u.nick;
+  const rightnick = user.nick == "" ? senderName : user.nick;
 
+  if (user.id == u.id) return msg.send(`@id${u.id} (${leftnick}) отсосал сам себе`);
+  if ((user.role == 1) && (u.role == 2)) return msg.send("Нельзя");
+  msg.send(`@id${u.id}` + `(` + leftnick + `) ` + `был изнасилован игроком @id${user.id}` + `(` + rightnick + `)`);
+});
+
+bot.hear(/^(?:!послать)$/i, async msg => {
+  const user = getUser(msg.senderId, msg.peerId);
+  const u = getUser(msg.replyMessage.senderId, msg.peerId);
+  const senderName = await getName(msg.senderId);
+  const replyName = await getName(msg.replyMessage.senderId);
+  const leftnick = u.nick == "" ? replyName : u.nick;
+  const rightnick = user.nick == "" ? senderName : user.nick;
+
+  if (user.id == u.id) return msg.send(`@id${u.id} (${leftnick}) пошел нахуй`);
+  if ((user.role == 1) && (u.role == 2)) return msg.send("Нельзя");
+  msg.send(`@id${u.id}` + `(` + leftnick + `) ` + `был послал нахуй игроком @id${user.id}` + `(` + rightnick + `)`);
 });
 
 bot.hear(/^(?:!админ|!адм|!admin)$/i, async msg => {
@@ -462,7 +480,9 @@ bot.hear(/^(?:!команды|!кмд|!помощь)$/i, msg => {
   if (user.role == 1) return msg.send(`
      Список команд:
      !ник, !nick - установить себе ник      
-     !стата, !статистика, !профиль, !stats - посмотреть статистику `);
+     !стата, !статистика, !профиль, !stats - посмотреть статистику
+     !изнас, !iznas - изнасиловать пользователя
+     !послать - послать нахуй пользователя`);
 
   msg.send(`
       Помощь:
@@ -477,6 +497,7 @@ bot.hear(/^(?:!команды|!кмд|!помощь)$/i, msg => {
       !стата, !статистика, !профиль, !stats - посмотреть статистику
       !разварн, !анварн, !унварн, !unwarn - снять предупреждение с пользователя
       !изнас, !iznas - изнасиловать пользователя
+      !послать - послать нахуй пользователя
       !ид, !айди, !id - получить conversationId сообщения
       !адм, !админ, !admin - выдать/забрать админку в боте
       !настройки - разрешить/запретить отправлять медиа
