@@ -378,7 +378,7 @@ bot.hear(/^(?:!изнас|!iznas)$/i, async msg => {
   msg.send(`@id${u.id}` + `(` + leftnick + `) ` + `был изнасилован игроком @id${user.id}` + `(` + rightnick + `)`);
 });
 
-bot.hear(/^(?:!послать)$/i, async msg => {
+bot.hear(/^(?:!послать|!fu|!fuckyou)$/i, async msg => {
   const user = getUser(msg.senderId, msg.peerId);
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
   const senderName = await getName(msg.senderId);
@@ -388,7 +388,7 @@ bot.hear(/^(?:!послать)$/i, async msg => {
 
   if (user.id == u.id) return msg.send(`@id${u.id} (${leftnick}) пошел нахуй`);
   if ((user.role == 1) && (u.role == 2)) return msg.send("Нельзя");
-  msg.send(`@id${u.id}` + `(` + leftnick + `) ` + `был послал нахуй игроком @id${user.id}` + `(` + rightnick + `)`);
+  msg.send(`@id${u.id}` + `(` + leftnick + `) ` + `был послан нахуй игроком @id${user.id}` + `(` + rightnick + `)`);
 });
 
 bot.hear(/^(?:!админ|!адм|!admin)$/i, async msg => {
@@ -497,7 +497,7 @@ bot.hear(/^(?:!команды|!кмд|!помощь)$/i, msg => {
       !стата, !статистика, !профиль, !stats - посмотреть статистику
       !разварн, !анварн, !унварн, !unwarn - снять предупреждение с пользователя
       !изнас, !iznas - изнасиловать пользователя
-      !послать - послать нахуй пользователя
+      !послать, !fu, !fuckyou - послать нахуй пользователя
       !ид, !айди, !id - получить conversationId сообщения
       !адм, !админ, !admin - выдать/забрать админку в боте
       !настройки - разрешить/запретить отправлять медиа
