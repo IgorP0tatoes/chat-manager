@@ -236,7 +236,7 @@ vk.updates.on('chat_invite_user', (msg, context) => {
   return context();
 });
 
-bot.hear(/^(?:!warn|!варн)$/i, (msg, next) => {
+bot.hear(/^(?:!warn|!варн) ?.*$/i, (msg, next) => {
   const user = getUser(msg.senderId, msg.peerId);
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
 
@@ -346,8 +346,8 @@ bot.hear(/^(?:!unwarn|!разварн|!унварн|!анварн)$/i, msg => {
 bot.hear(/^(?:!stats|!стата|!статистика|!профиль) ?.*$/i, msg => {
   const spt = msg.text.split(' ');
   const id = spt[1] || msg.senderId;
-
   const user = getUser(id, msg.peerId);
+
   if (user.role == 1) return getName(user.id).then(fullName => msg.send(`@id${user.id}` + `(` + fullName + `)` +
      `\nНик: ` + user.nick + `\nКоличество варнов: ` + user.warns + `\nВсего сообщений: ` + user.messages));
 
@@ -373,8 +373,9 @@ bot.hear(/^(?:!изнас|!iznas)$/i, async msg => {
   const leftnick = u.nick == "" ? replyName : u.nick;
   const rightnick = user.nick == "" ? senderName : user.nick;
 
-  if (user.id == u.id) return msg.send(`@id${u.id} (${leftnick}) отсосал сам себе`);
+  if (user.id == u.id) return msg.send(`@id${u.id} (${leftnick}) изнасиловал сам себя`);
   if ((user.role == 1) && (u.role == 2)) return msg.send("Нельзя");
+
   msg.send(`@id${u.id}` + `(` + leftnick + `) ` + `был изнасилован игроком @id${user.id}` + `(` + rightnick + `)`);
 });
 
@@ -388,6 +389,7 @@ bot.hear(/^(?:!послать|!fu|!fuckyou)$/i, async msg => {
 
   if (user.id == u.id) return msg.send(`@id${u.id} (${leftnick}) пошел нахуй`);
   if ((user.role == 1) && (u.role == 2)) return msg.send("Нельзя");
+
   msg.send(`@id${u.id}` + `(` + leftnick + `) ` + `был послан нахуй игроком @id${user.id}` + `(` + rightnick + `)`);
 });
 
@@ -411,9 +413,9 @@ bot.hear(/^(?:!админ|!адм|!admin)$/i, async msg => {
 });
 
 bot.hear(/^(?:!banlist|!банлист)$/i, async msg => {
-  const banned = getMessagesStatement.all(msg.peerId);
+  const banned = getBanlistStatement.all(msg.peerId).map(x => x.id);
   const names = await getNames(banned);
-
+  
   msg.send(banned.map((x, i) => "@id" + x + " (" + names[i] + ")").join(", ") +
     "\n Всего забанено: " + banned.length + " человек");
 });
