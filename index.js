@@ -138,7 +138,7 @@ function getUser(id, peerId) {
 
       vk.api.messages.getConversationMembers({ peer_id: user.peerId }).then(x => {
         if (x.items.filter(x => x.member_id == user.id)?.[0]?.is_admin || false) {
-          user.role = 2;
+          if (user.id > 0) user.role = 2;
           saveUser(user);
           if (user.id > 0) vk.api.messages.send({ message: `Выдача админ-прав прошла успешно`, random_id: Math.floor(Math.random() * 2000000), peer_id: user.peerId });
         }
@@ -230,7 +230,7 @@ vk.updates.on('message', bot.middleware);
 vk.updates.on('chat_invite_user', (msg, context) => {
   const user = getUser(msg.eventMemberId, msg.peerId);
   if (user.ban) {
-    getName(msg.replyMessage.senderId).then(fullName => msg.send(`Пользователь @id${u.id}` + `(` + fullName + `) ` + `забанен!`));
+    msg.send(`Пользователь @id${user.id} забанен!`);
     vk.api.messages.removeChatUser({ chat_id: msg.chatId, user_id: user.id })
   }
   return context();
@@ -463,15 +463,17 @@ bot.hear(/^(?:!invitel) ?.*$/i, msg => {
 });
 
 bot.hear(/^(?:!ник|!nick) ?.*$/i, msg => {
-  const spt = msg.text.split(' ');
+  const idx = msg.text.indexOf(' ');
+  if (idx == -1) return msg.send("Ошибка: не указан ник");
+  const nickname = msg.text.substring(idx).trim();
   const user = getUser(msg.senderId, msg.peerId);
 
-  if (spt[1] == null) return msg.send("Использование: !ник <ник>\n" + "Описание: установить себе никнейм");
-  if (spt[1].length > 20) {
+  if (nickname == null) return msg.send("Использование: !ник <ник>\n" + "Описание: установить себе никнейм");
+  if (nickname.length > 20) {
     user.nick = null;
     return msg.send("Ошибка: макс. длина ника 20 символов");
   }
-  user.nick = spt[1];
+  user.nick = nickname;
   saveUser(user);
   getName(msg.senderId).then(fullName =>  msg.send(`Установлен ник "` + user.nick + `" для пользователя @id${user.id} (` + fullName + `)`));
 });
