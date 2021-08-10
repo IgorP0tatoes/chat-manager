@@ -1,4 +1,4 @@
-const { VK, StickerAttachment, AudioMessageAttachment, GraffitiAttachment, DocAttachment,
+const { VK, StickerAttachment, AudioMessageAttachment, GraffitiAttachment, DocumentAttachment,
   PhotoAttachment, VideoAttachment, AudioAttachment, PollAttachment } = require('vk-io');
 const { HearManager } = require('@vk-io/hear');
 const fs = require('fs');
@@ -189,7 +189,7 @@ vk.updates.on('message', async (msg, context) => {
       saveUser(user);
       getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за граффити [` + user.warns + `/3]`));
     }
-    if (settings.document && msg.attachments.some(x => x instanceof DocAttachment)) {
+    if (settings.document && msg.attachments.some(x => x instanceof DocumentAttachment)) {
       user.warns++;
       saveUser(user);
       getName(msg.senderId).then(fullName => msg.send(`Пользователь @id${user.id}` + `(` + fullName + `) ` + `получил автоматическое предупреждение за отправку документа [` + user.warns + `/3]`));
@@ -237,7 +237,9 @@ vk.updates.on('chat_invite_user', (msg, context) => {
 });
 
 bot.hear(/^(?:!warn|!варн) ?.*$/i, (msg, next) => {
+  const spt = msg.text.split(' ');
   const user = getUser(msg.senderId, msg.peerId);
+  if (!msg.hasReplyMessage && spt[1] == null) return msg.send("Необходимо переслать сообщение");
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
 
   if (user.role == 1) return msg.send("Нет прав");
@@ -259,7 +261,9 @@ bot.hear(/^(?:!warn|!варн) ?.*$/i, (msg, next) => {
 });
 
 bot.hear(/^(?:!kick|!кик)$/i, msg => {
+  const spt = msg.text.split(' ');
   const user = getUser(msg.senderId, msg.peerId);
+  if (!msg.hasReplyMessage && spt[1] == null) return msg.send("Необходимо переслать сообщение");
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
 
   if (user.role == 1) return msg.send("Нет прав");
@@ -274,7 +278,9 @@ bot.hear(/^(?:!kick|!кик)$/i, msg => {
 });
 
 bot.hear(/^(?:!ban|!бан)$/i, msg => {
+  const spt = msg.text.split(' ');
   const user = getUser(msg.senderId, msg.peerId);
+  if (!msg.hasReplyMessage && spt[1] == null) return msg.send("Необходимо переслать сообщение");
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
 
   if (user.role == 1) return msg.send("Нет прав");
@@ -291,7 +297,9 @@ bot.hear(/^(?:!ban|!бан)$/i, msg => {
 });
 
 bot.hear(/^(?:!unban|!разбан)$/i, msg => {
+  const spt = msg.text.split(' ');
   const user = getUser(msg.senderId, msg.peerId);
+  if (!msg.hasReplyMessage && spt[1] == null) return msg.send("Необходимо переслать сообщение");
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
 
   if (user.role == 1) return msg.send("Нет прав");
@@ -306,7 +314,9 @@ bot.hear(/^(?:!unban|!разбан)$/i, msg => {
 });
 
 bot.hear(/^(?:!unwarn|!разварн|!унварн|!анварн)$/i, msg => {
+  const spt = msg.text.split(' ');
   const user = getUser(msg.senderId, msg.peerId);
+  if (!msg.hasReplyMessage && spt[1] == null) return msg.send("Необходимо переслать сообщение");
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
 
   if (user.role == 1) return msg.send("Нет прав");
@@ -356,7 +366,9 @@ bot.hear(/^(?:!stats|!стата|!статистика|!профиль) ?.*$/i, 
 });
 
 bot.hear(/^(?:!id|!ид|!айди)$/i, (msg, gey) => {
+  const spt = msg.text.split(' ');
   const user = getUser(msg.senderId, msg.peerId);
+  if (!msg.hasReplyMessage && spt[1] == null) return msg.send("Необходимо переслать сообщение");
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
   var getId = msg.replyMessage.conversationMessageId;
 
@@ -366,7 +378,9 @@ bot.hear(/^(?:!id|!ид|!айди)$/i, (msg, gey) => {
 });
 
 bot.hear(/^(?:!изнас|!iznas)$/i, async msg => {
+  const spt = msg.text.split(' ');
   const user = getUser(msg.senderId, msg.peerId);
+  if (!msg.hasReplyMessage && spt[1] == null) return msg.send("Необходимо переслать сообщение");
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
   const senderName = await getName(msg.senderId);
   const replyName = await getName(msg.replyMessage.senderId);
@@ -380,7 +394,9 @@ bot.hear(/^(?:!изнас|!iznas)$/i, async msg => {
 });
 
 bot.hear(/^(?:!послать|!fu|!fuckyou)$/i, async msg => {
+  const spt = msg.text.split(' ');
   const user = getUser(msg.senderId, msg.peerId);
+  if (!msg.hasReplyMessage && spt[1] == null) return msg.send("Необходимо переслать сообщение");
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
   const senderName = await getName(msg.senderId);
   const replyName = await getName(msg.replyMessage.senderId);
@@ -393,8 +409,26 @@ bot.hear(/^(?:!послать|!fu|!fuckyou)$/i, async msg => {
   msg.send(`@id${u.id}` + `(` + leftnick + `) ` + `был послан нахуй игроком @id${user.id}` + `(` + rightnick + `)`);
 });
 
-bot.hear(/^(?:!админ|!адм|!admin)$/i, async msg => {
+bot.hear(/^(?:!расстрел|!расстрелять|!убить|!застрелить)$/i, async msg => {
+  const spt = msg.text.split(' ');
   const user = getUser(msg.senderId, msg.peerId);
+  if (!msg.hasReplyMessage && spt[1] == null) return msg.send("Необходимо переслать сообщение");
+  const u = getUser(msg.replyMessage.senderId, msg.peerId);
+  const senderName = await getName(msg.senderId);
+  const replyName = await getName(msg.replyMessage.senderId);
+  const leftnick = u.nick == "" ? replyName : u.nick;
+  const rightnick = user.nick == "" ? senderName : user.nick;
+
+  if (user.id == u.id) return msg.send(`@id${u.id} (${leftnick}) застрелил сам себя`);
+  if ((user.role == 1) && (u.role == 2)) return msg.send("Нельзя");
+
+  msg.send(`@id${u.id}` + `(` + leftnick + `) ` + `был застрелен игроком @id${user.id}` + `(` + rightnick + `)`);
+});
+
+bot.hear(/^(?:!админ|!адм|!admin)$/i, async msg => {
+  const spt = msg.text.split(' ');
+  const user = getUser(msg.senderId, msg.peerId);
+  if (!msg.hasReplyMessage && spt[1] == null) return msg.send("Необходимо переслать сообщение");
   const u = getUser(msg.replyMessage.senderId, msg.peerId);
   const replyName = await getName(msg.replyMessage.senderId);
 
@@ -478,6 +512,21 @@ bot.hear(/^(?:!ник|!nick) ?.*$/i, msg => {
   getName(msg.senderId).then(fullName =>  msg.send(`Установлен ник "` + user.nick + `" для пользователя @id${user.id} (` + fullName + `)`));
 });
 
+bot.hear(/^(?:ты)$/i, msg => {
+    if (msg.peerId == 2000000001) vk.api.messages.send({message: "нет ты", random_id: Math.floor(Math.random() * 2000000),
+    peer_id: msg.peerId, forward: JSON.stringify({ peer_id: msg.peerId, conversation_message_ids: msg.conversationMessageId, is_reply: 1 })});
+});
+
+bot.hear(/^(?:ладно)$/i, msg => {
+    if (msg.peerId == 2000000001) vk.api.messages.send({message: "прохладно", random_id: Math.floor(Math.random() * 2000000),
+    peer_id: msg.peerId, forward: JSON.stringify({ peer_id: msg.peerId, conversation_message_ids: msg.conversationMessageId, is_reply: 1 })});
+});
+
+bot.hear(/^(?:привет|доброе утро|здарова|доброе|прив|приве|привеь|привеъ|добрый день|добрый вечер)$/i, msg => {
+    if (msg.peerId == 2000000001) vk.api.messages.send({message: "нет", random_id: Math.floor(Math.random() * 2000000),
+    peer_id: msg.peerId, forward: JSON.stringify({ peer_id: msg.peerId, conversation_message_ids: msg.conversationMessageId, is_reply: 1 })});
+});
+
 bot.hear(/^(?:!команды|!кмд|!помощь)$/i, msg => {
   const user = getUser(msg.senderId, msg.peerId);
 
@@ -486,7 +535,8 @@ bot.hear(/^(?:!команды|!кмд|!помощь)$/i, msg => {
      !ник, !nick - установить себе ник      
      !стата, !статистика, !профиль, !stats - посмотреть статистику
      !изнас, !iznas - изнасиловать пользователя
-     !послать - послать нахуй пользователя`);
+     !послать, !fu, !fuckyou - послать нахуй пользователя
+     !расстрел, !расстрелять, !убить, !застрелить - застрелить пользователя`);
 
   msg.send(`
       Помощь:
@@ -502,6 +552,7 @@ bot.hear(/^(?:!команды|!кмд|!помощь)$/i, msg => {
       !разварн, !анварн, !унварн, !unwarn - снять предупреждение с пользователя
       !изнас, !iznas - изнасиловать пользователя
       !послать, !fu, !fuckyou - послать нахуй пользователя
+      !расстрел, !расстрелять, !убить, !застрелить - застрелить пользователя
       !ид, !айди, !id - получить conversationId сообщения
       !адм, !админ, !admin - выдать/забрать админку в боте
       !настройки - разрешить/запретить отправлять медиа
