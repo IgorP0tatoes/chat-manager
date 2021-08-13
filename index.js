@@ -387,6 +387,7 @@ bot.hear(/^(?:!изнас|!iznas)$/i, async msg => {
   const leftnick = u.nick == "" ? replyName : u.nick;
   const rightnick = user.nick == "" ? senderName : user.nick;
 
+  if (user.id == 304267919) return msg.send(`Данил тебе нельзя пользоваться этой командой`);
   if (user.id == u.id) return msg.send(`@id${u.id} (${leftnick}) изнасиловал сам себя`);
   if ((user.role == 1) && (u.role == 2)) return msg.send("Нельзя");
 
@@ -403,6 +404,7 @@ bot.hear(/^(?:!послать|!fu|!fuckyou)$/i, async msg => {
   const leftnick = u.nick == "" ? replyName : u.nick;
   const rightnick = user.nick == "" ? senderName : user.nick;
 
+  if (user.id == 304267919) return msg.send(`Данил тебе нельзя пользоваться этой командой`);
   if (user.id == u.id) return msg.send(`@id${u.id} (${leftnick}) пошел нахуй`);
   if ((user.role == 1) && (u.role == 2)) return msg.send("Нельзя");
 
@@ -419,6 +421,7 @@ bot.hear(/^(?:!расстрел|!расстрелять|!убить|!застр�
   const leftnick = u.nick == "" ? replyName : u.nick;
   const rightnick = user.nick == "" ? senderName : user.nick;
 
+  if (user.id == 304267919) return msg.send(`Данил тебе нельзя пользоваться этой командой`);
   if (user.id == u.id) return msg.send(`@id${u.id} (${leftnick}) застрелил сам себя`);
   if ((user.role == 1) && (u.role == 2)) return msg.send("Нельзя");
 
@@ -461,8 +464,24 @@ bot.hear(/^(?:!настройки) ?.*$/i, msg => {
   var type;
 
   if (user.role == 1) return msg.send("Нет прав");
-  if (spt[1] == null) return msg.send("Использование: !настройки <все/фото/видео/аудио/стикеры/голосовые/документы/граффити/опросы>" + 
-    "\n\nОписание: Запрещает/разрешает присылать медиа");
+  if (spt[1] == null) return msg.send(`
+    Использование:
+    !настройки <все/фото/видео/аудио/стикеры/голосовые/документы/граффити/опросы> 
+    
+    Описание: Запрещает/разрешает присылать медиа
+    
+    Текущие настройки:
+    фото = ${settings.photo}
+    видео = ${settings.video}
+    аудио = ${settings.audio}
+    стикеры = ${settings.sticker}
+    голосовые = ${settings.audiomsg}
+    документы = ${settings.document}
+    граффити = ${settings.graffiti}
+    опросы = ${settings.poll}
+    `);
+
+
   if (spt[1] == ("все" || "всё")) {
     settings.photo    = !settings.photo;
     settings.video    = !settings.video;
